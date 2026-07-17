@@ -32,6 +32,21 @@ tgeye chats allow <chat-id>   # allow storing its content
 tgeye doctor                  # verify everything is green
 ```
 
+### Collecting: daemon vs one-shot
+
+The Telegram Bot API has no "fetch history" call — a bot only ever receives
+messages as a live stream. tgeye stores that stream locally, so it must be
+listening when messages arrive. Two ways to collect:
+
+- `tgeye run` — continuous collector (a daemon); nothing is missed.
+- `tgeye sync` — collect the queued backlog in one pass and exit. Telegram buffers
+  undelivered updates for ~24h, so a periodic `tgeye sync` (before an agent session,
+  or from cron) keeps the database fresh without a running daemon. It only covers
+  the last ~24h and only since the bot joined the chat.
+
+A given bot can be polled by exactly one collector at a time — don't run `run` and
+`sync` (or two projects) against the same token concurrently.
+
 4. Connect to an MCP client, e.g. Claude Code:
 
 ```sh

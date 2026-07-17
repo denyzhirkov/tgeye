@@ -2510,7 +2510,7 @@ dependencies = [
 
 [[package]]
 name = "tgeye-app"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2532,7 +2532,7 @@ dependencies = [
 
 [[package]]
 name = "tgeye-config"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "chrono-tz",
  "secrecy",
@@ -2544,7 +2544,7 @@ dependencies = [
 
 [[package]]
 name = "tgeye-domain"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2553,7 +2553,7 @@ dependencies = [
 
 [[package]]
 name = "tgeye-mcp-server"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -2574,7 +2574,7 @@ dependencies = [
 
 [[package]]
 name = "tgeye-storage"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "sqlx",
@@ -2587,7 +2587,7 @@ dependencies = [
 
 [[package]]
 name = "tgeye-telegram"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "secrecy",

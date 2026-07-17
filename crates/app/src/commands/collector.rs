@@ -2,15 +2,20 @@ use std::path::Path;
 use std::time::Duration;
 
 use chrono::Utc;
+use secrecy::SecretString;
 use sqlx::SqlitePool;
-use tgeye_config::AppConfig;
+use tgeye_config::{AppConfig, TokenSource};
 use tgeye_domain::{CollectedUpdate, IncomingMessage, chat_allowed};
-use tgeye_storage::repo;
+use tgeye_storage::{queries, repo};
 use tgeye_telegram::{FetchedUpdate, TelegramError, UpdatePoller};
 
 use super::{env, privacy_hint};
 
-pub async fn run(data_dir: &Path) -> anyhow::Result<()> {
+/// Shared startup: load config, resolve token, open the DB, refuse to run with
+/// pending migrations.
+async fn prepare(
+    data_dir: &Path,
+) -> anyhow::Result<(AppConfig, SecretString, TokenSource, SqlitePool)> {
     let config = AppConfig::load(data_dir, env)?;
     let (token, source) = tgeye_config::load_bot_token(data_dir, env)?;
     let pool = tgeye_storage::connect(&config.database_path(data_dir)).await?;
@@ -19,6 +24,16 @@ pub async fn run(data_dir: &Path) -> anyhow::Result<()> {
         pending == 0,
         "{pending} pending migration(s) — run `tgeye migrate` first"
     );
+    Ok((config, token, source, pool))
+}
+
+async fn message_count(pool: &SqlitePool) -> anyhow::Result<i64> {
+    let mut conn = pool.acquire().await?;
+    Ok(queries::stats(&mut conn).await?.message_count)
+}
+
+pub async fn run(data_dir: &Path) -> anyhow::Result<()> {
+    let (config, token, source, pool) = prepare(data_dir).await?;
 
     let identity = tgeye_telegram::validate_token(&token).await?;
     println!(
@@ -72,6 +87,59 @@ pub async fn run(data_dir: &Path) -> anyhow::Result<()> {
     }
 
     println!("\nCollector stopped; offset saved.");
+    Ok(())
+}
+
+/// One-shot drain of the queued backlog (Telegram buffers undelivered updates for
+/// ~24h): short-poll getUpdates repeatedly until a batch comes back empty, then exit.
+pub async fn sync(data_dir: &Path) -> anyhow::Result<()> {
+    let (config, token, source, pool) = prepare(data_dir).await?;
+
+    let identity = tgeye_telegram::validate_token(&token).await?;
+    println!("Syncing as @{} (token from {source}).", identity.username);
+    println!("{}", privacy_hint(&identity));
+
+    // timeout=0 → short poll: take whatever is queued and return immediately.
+    let poller = UpdatePoller::new(&token, 0);
+    let require_allowlist = config.security.require_chat_allowlist;
+    let mut last_update_id = {
+        let mut conn = pool.acquire().await?;
+        repo::load_offset(&mut conn).await?
+    };
+
+    let before = message_count(&pool).await?;
+    let mut processed = 0usize;
+    // Safety cap so an extremely busy chat can't loop forever (~100k updates).
+    const MAX_ITERATIONS: usize = 1000;
+
+    for _ in 0..MAX_ITERATIONS {
+        let updates = match poller.fetch(last_update_id).await {
+            Ok(updates) => updates,
+            Err(TelegramError::RetryAfter(secs)) => {
+                tracing::warn!(secs, "rate limited on getUpdates; waiting");
+                tokio::time::sleep(Duration::from_secs(secs)).await;
+                continue;
+            }
+            Err(error) => return Err(anyhow::anyhow!("getUpdates failed: {error}")),
+        };
+        if updates.is_empty() {
+            break;
+        }
+        for update in updates {
+            if let Err(error) = process_update(&pool, &update, require_allowlist).await {
+                tracing::error!(update.update_id, %error, "failed to process update");
+            }
+            last_update_id = Some(update.update_id);
+            processed += 1;
+        }
+    }
+
+    let stored = message_count(&pool).await? - before;
+    if processed == 0 {
+        println!("Nothing new — backlog is empty.");
+    } else {
+        println!("Synced {processed} update(s); {stored} new message(s) stored.");
+    }
     Ok(())
 }
 
