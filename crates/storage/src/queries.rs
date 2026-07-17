@@ -1,8 +1,30 @@
+use sqlx::sqlite::SqliteRow;
 use sqlx::{QueryBuilder, Row, Sqlite, SqliteConnection};
 
 use crate::StorageError;
 
 type Result<T> = std::result::Result<T, StorageError>;
+
+const MESSAGE_COLUMNS: &str = "id, chat_id, telegram_message_id, thread_id, sender_user_id, \
+     sender_chat_id, reply_to_message_id, media_group_id, kind, text, sent_at, edited_at, is_service";
+
+fn message_from_row(r: &SqliteRow) -> MessageRow {
+    MessageRow {
+        id: r.get("id"),
+        chat_id: r.get("chat_id"),
+        telegram_message_id: r.get("telegram_message_id"),
+        thread_id: r.get("thread_id"),
+        sender_user_id: r.get("sender_user_id"),
+        sender_chat_id: r.get("sender_chat_id"),
+        reply_to_message_id: r.get("reply_to_message_id"),
+        media_group_id: r.get("media_group_id"),
+        kind: r.get("kind"),
+        text: r.get("text"),
+        sent_at: r.get("sent_at"),
+        edited_at: r.get("edited_at"),
+        is_service: r.get("is_service"),
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ChatRow {
@@ -127,22 +149,149 @@ pub async fn query_messages(
         .push_bind(query.limit);
 
     let rows = builder.build().fetch_all(conn).await?;
+    Ok(rows.iter().map(message_from_row).collect())
+}
+
+pub async fn get_message(
+    conn: &mut SqliteConnection,
+    chat_id: i64,
+    telegram_message_id: i64,
+) -> Result<Option<MessageRow>> {
+    let sql = format!(
+        "SELECT {MESSAGE_COLUMNS} FROM messages
+         WHERE is_deleted = 0 AND chat_id = ? AND telegram_message_id = ?"
+    );
+    let row = sqlx::query(&sql)
+        .bind(chat_id)
+        .bind(telegram_message_id)
+        .fetch_optional(conn)
+        .await?;
+    Ok(row.as_ref().map(message_from_row))
+}
+
+/// `count` messages on one side of the anchor, ordered outward then returned in
+/// chronological order. `newer = true` selects messages sent at/after the anchor
+/// position; `false` selects strictly before it.
+pub async fn context_side(
+    conn: &mut SqliteConnection,
+    chat_id: i64,
+    anchor_sent_at: &str,
+    anchor_message_id: i64,
+    newer: bool,
+    include_anchor: bool,
+    count: i64,
+) -> Result<Vec<MessageRow>> {
+    if count <= 0 {
+        return Ok(vec![]);
+    }
+    let (op, dir) = if newer { (">", "ASC") } else { ("<", "DESC") };
+    let eq = if include_anchor { "=" } else { "" };
+    let sql = format!(
+        "SELECT {MESSAGE_COLUMNS} FROM messages
+         WHERE is_deleted = 0 AND chat_id = ?
+           AND (sent_at {op} ? OR (sent_at = ? AND telegram_message_id {op}{eq} ?))
+         ORDER BY sent_at {dir}, telegram_message_id {dir} LIMIT ?"
+    );
+    let mut rows: Vec<MessageRow> = sqlx::query(&sql)
+        .bind(chat_id)
+        .bind(anchor_sent_at)
+        .bind(anchor_sent_at)
+        .bind(anchor_message_id)
+        .bind(count)
+        .fetch_all(conn)
+        .await?
+        .iter()
+        .map(message_from_row)
+        .collect();
+    if !newer {
+        rows.reverse(); // DESC fetch → chronological
+    }
+    Ok(rows)
+}
+
+/// Walk reply_to_message_id upward from the anchor (excluded), oldest ancestor last
+/// in walk order; bounded by `max_depth`. Cycles are broken by the visited set.
+pub async fn reply_ancestors(
+    conn: &mut SqliteConnection,
+    chat_id: i64,
+    start_reply_to: Option<i64>,
+    max_depth: usize,
+) -> Result<Vec<MessageRow>> {
+    let mut ancestors = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut next = start_reply_to;
+    while let Some(target) = next {
+        if ancestors.len() >= max_depth || !seen.insert(target) {
+            break;
+        }
+        match get_message(conn, chat_id, target).await? {
+            Some(msg) => {
+                next = msg.reply_to_message_id;
+                ancestors.push(msg);
+            }
+            None => break,
+        }
+    }
+    Ok(ancestors)
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchHit {
+    pub message: MessageRow,
+    pub snippet: String,
+    pub rank: f64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SearchQuery {
+    /// Sanitized FTS5 MATCH expression (see `crate::fts`).
+    pub match_expr: String,
+    /// Empty = all allowed chats the caller already resolved.
+    pub chat_ids: Vec<i64>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub limit: i64,
+}
+
+pub async fn search_messages(
+    conn: &mut SqliteConnection,
+    query: &SearchQuery,
+) -> Result<Vec<SearchHit>> {
+    let mut builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT m.id, m.chat_id, m.telegram_message_id, m.thread_id, m.sender_user_id,
+                m.sender_chat_id, m.reply_to_message_id, m.media_group_id, m.kind, m.text,
+                m.sent_at, m.edited_at, m.is_service,
+                snippet(messages_fts, 1, '[', ']', '…', 12) AS snippet,
+                messages_fts.rank AS rank
+         FROM messages_fts
+         JOIN messages m ON m.id = messages_fts.message_id
+         WHERE messages_fts MATCH ",
+    );
+    builder.push_bind(query.match_expr.clone());
+    builder.push(" AND m.is_deleted = 0");
+    if !query.chat_ids.is_empty() {
+        builder.push(" AND m.chat_id IN (");
+        let mut separated = builder.separated(", ");
+        for chat_id in &query.chat_ids {
+            separated.push_bind(*chat_id);
+        }
+        builder.push(")");
+    }
+    if let Some(from) = &query.from {
+        builder.push(" AND m.sent_at >= ").push_bind(from.clone());
+    }
+    if let Some(to) = &query.to {
+        builder.push(" AND m.sent_at < ").push_bind(to.clone());
+    }
+    builder.push(" ORDER BY rank LIMIT ").push_bind(query.limit);
+
+    let rows = builder.build().fetch_all(conn).await?;
     Ok(rows
-        .into_iter()
-        .map(|r| MessageRow {
-            id: r.get("id"),
-            chat_id: r.get("chat_id"),
-            telegram_message_id: r.get("telegram_message_id"),
-            thread_id: r.get("thread_id"),
-            sender_user_id: r.get("sender_user_id"),
-            sender_chat_id: r.get("sender_chat_id"),
-            reply_to_message_id: r.get("reply_to_message_id"),
-            media_group_id: r.get("media_group_id"),
-            kind: r.get("kind"),
-            text: r.get("text"),
-            sent_at: r.get("sent_at"),
-            edited_at: r.get("edited_at"),
-            is_service: r.get("is_service"),
+        .iter()
+        .map(|r| SearchHit {
+            message: message_from_row(r),
+            snippet: r.get("snippet"),
+            rank: r.get("rank"),
         })
         .collect())
 }
@@ -186,6 +335,33 @@ pub async fn attachments_for_message(
             duration_secs: r.get("duration_secs"),
         })
         .collect())
+}
+
+#[derive(Debug, Clone)]
+pub struct ChatStats {
+    pub message_count: i64,
+    pub first_message_at: Option<String>,
+    pub last_message_at: Option<String>,
+    pub edited_count: i64,
+}
+
+pub async fn chat_stats(conn: &mut SqliteConnection, chat_id: i64) -> Result<ChatStats> {
+    let row = sqlx::query(
+        "SELECT COUNT(*) AS message_count,
+                MIN(sent_at) AS first_message_at,
+                MAX(sent_at) AS last_message_at,
+                COALESCE(SUM(edited_at IS NOT NULL), 0) AS edited_count
+         FROM messages WHERE is_deleted = 0 AND chat_id = ?",
+    )
+    .bind(chat_id)
+    .fetch_one(conn)
+    .await?;
+    Ok(ChatStats {
+        message_count: row.get("message_count"),
+        first_message_at: row.get("first_message_at"),
+        last_message_at: row.get("last_message_at"),
+        edited_count: row.get("edited_count"),
+    })
 }
 
 #[derive(Debug, Clone)]

@@ -46,9 +46,15 @@ Keep `tgeye run` running (a separate terminal or a background service) — it co
 | Tool | Purpose |
 |---|---|
 | `telegram_get_server_info` | Bot identity, storage stats, limits |
+| `telegram_health_check` | Database, migration and ingestion health |
 | `telegram_list_chats` | Known chats with access status and message counts |
+| `telegram_get_chat` | One chat's details and message statistics |
 | `telegram_get_messages` | Messages of an allowed chat in a time range, cursor pagination |
 | `telegram_get_recent_messages` | Latest messages, newest first |
+| `telegram_get_message` | A single message by id |
+| `telegram_get_message_context` | A message plus surrounding messages and reply ancestors |
+| `telegram_get_reply_chain` | The chain of messages a message replies to |
+| `telegram_search_messages` | Full-text search across allowed chats (ranked, highlighted) |
 
 Telegram content returned by the tools is untrusted user-generated data — agents are
 warned to treat it as data, not instructions.

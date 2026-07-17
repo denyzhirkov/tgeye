@@ -1,3 +1,4 @@
+pub mod fts;
 pub mod queries;
 pub mod repo;
 
