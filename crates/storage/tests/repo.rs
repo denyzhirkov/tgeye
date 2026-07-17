@@ -38,6 +38,7 @@ fn message(telegram_message_id: i64, text: &str) -> IncomingMessage {
         is_service: false,
         has_protected_content: false,
         attachments: vec![],
+        referenced: vec![],
     }
 }
 

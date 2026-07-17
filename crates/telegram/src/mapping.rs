@@ -35,6 +35,16 @@ fn update_kind_name(kind: &UpdateKind) -> &'static str {
 }
 
 pub fn map_message(msg: &Message) -> IncomingMessage {
+    let mut mapped = map_message_shallow(msg);
+    // The reply parent rides along in the update; back it up (one level, no deeper
+    // nesting — Telegram doesn't carry the grandparent).
+    if let Some(parent) = msg.reply_to_message() {
+        mapped.referenced.push(map_message_shallow(parent));
+    }
+    mapped
+}
+
+fn map_message_shallow(msg: &Message) -> IncomingMessage {
     let (kind, attachments, is_service) = classify(msg);
     IncomingMessage {
         chat: map_chat(&msg.chat),
@@ -51,6 +61,7 @@ pub fn map_message(msg: &Message) -> IncomingMessage {
         is_service,
         has_protected_content: msg.has_protected_content(),
         attachments,
+        referenced: vec![],
     }
 }
 
@@ -262,6 +273,34 @@ mod tests {
         assert_eq!(sender.username.as_deref(), Some("dz"));
         assert!(msg.attachments.is_empty());
         assert!(!msg.is_service);
+
+        // Reply parent is captured for backfill.
+        assert_eq!(msg.referenced.len(), 1);
+        let parent = &msg.referenced[0];
+        assert_eq!(parent.telegram_message_id, 90);
+        assert_eq!(parent.text.as_deref(), Some("earlier"));
+        assert!(parent.referenced.is_empty(), "backfill is one level deep");
+    }
+
+    #[test]
+    fn non_reply_has_no_referenced() {
+        let update = parse_update(
+            r#"{
+                "update_id": 700010,
+                "message": {
+                    "message_id": 200,
+                    "date": 1752750000,
+                    "chat": {"id": -100987, "type": "group", "title": "G"},
+                    "from": {"id": 42, "is_bot": false, "first_name": "Denis"},
+                    "text": "standalone"
+                }
+            }"#,
+        );
+        let CollectedUpdate::NewMessage(msg) = map_update(&update) else {
+            panic!("expected NewMessage");
+        };
+        assert!(msg.referenced.is_empty());
+        assert_eq!(msg.reply_to_message_id, None);
     }
 
     #[test]

@@ -201,6 +201,12 @@ async fn persist(
         return Ok(());
     }
 
+    // Back up referenced messages (reply parent) the bot may have never seen.
+    // INSERT OR IGNORE never overwrites an existing, fuller row.
+    for parent in &msg.referenced {
+        backfill(conn, parent, now).await?;
+    }
+
     if let Some(sender) = &msg.sender {
         repo::upsert_user(conn, sender, now).await?;
     }
@@ -218,5 +224,28 @@ async fn persist(
         is_edit,
         "stored"
     );
+    Ok(())
+}
+
+/// Insert a referenced (reply-parent) message if absent. Caller already verified
+/// the chat is allowed; the parent shares that chat.
+async fn backfill(
+    conn: &mut sqlx::SqliteConnection,
+    parent: &IncomingMessage,
+    now: chrono::DateTime<Utc>,
+) -> anyhow::Result<()> {
+    if let Some(sender) = &parent.sender {
+        repo::upsert_user(conn, sender, now).await?;
+    }
+    if let Some(row_id) = repo::insert_message(conn, parent, now).await? {
+        if !parent.attachments.is_empty() {
+            repo::insert_attachments(conn, &row_id, &parent.attachments).await?;
+        }
+        tracing::debug!(
+            chat_id = parent.chat.id,
+            telegram_message_id = parent.telegram_message_id,
+            "backfilled reply parent"
+        );
+    }
     Ok(())
 }

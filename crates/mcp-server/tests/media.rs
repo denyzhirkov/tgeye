@@ -78,6 +78,7 @@ fn doc_message() -> IncomingMessage {
             height: None,
             duration_secs: None,
         }],
+        referenced: vec![],
     }
 }
 

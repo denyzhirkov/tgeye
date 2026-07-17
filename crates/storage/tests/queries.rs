@@ -41,6 +41,7 @@ fn message(id: i64, reply_to: Option<i64>, minute: i64, text: &str) -> IncomingM
         is_service: false,
         has_protected_content: false,
         attachments: vec![],
+        referenced: vec![],
     }
 }
 

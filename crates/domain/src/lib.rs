@@ -113,6 +113,10 @@ pub struct IncomingMessage {
     pub is_service: bool,
     pub has_protected_content: bool,
     pub attachments: Vec<AttachmentMeta>,
+    /// Messages carried inside this update that the bot may not have seen on their
+    /// own — currently the reply parent (`reply_to_message`). Persisted as backfill
+    /// so referenced context survives even if the bot joined after they were sent.
+    pub referenced: Vec<IncomingMessage>,
 }
 
 #[derive(Debug, Clone)]
