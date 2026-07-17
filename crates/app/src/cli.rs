@@ -25,6 +25,8 @@ pub enum Command {
     Doctor,
     /// Run the Telegram collector (long polling; Ctrl-C to stop)
     Run,
+    /// Run the MCP server over stdio (for MCP clients; stdout is the protocol channel)
+    RunMcp,
     /// Known chats and their access rules
     #[command(subcommand)]
     Chats(ChatsCommand),

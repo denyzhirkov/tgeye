@@ -1,31 +1,25 @@
 [package]
-name = "tgeye-app"
+name = "tgeye-mcp-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[[bin]]
-name = "tgeye"
-path = "src/main.rs"
+[lib]
+name = "tgeye_mcp_server"
 
 [dependencies]
-anyhow = { workspace = true }
+base64 = { workspace = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
-clap = { workspace = true }
-secrecy = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
-tgeye-config = { workspace = true }
 tgeye-domain = { workspace = true }
-tgeye-mcp-server = { workspace = true }
 tgeye-storage = { workspace = true }
-tgeye-telegram = { workspace = true }
-tokio = { workspace = true }
-toml = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true

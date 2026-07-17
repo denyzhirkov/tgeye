@@ -3,6 +3,7 @@ mod collector;
 mod config_cmd;
 mod doctor;
 mod init;
+mod mcp;
 mod migrate;
 mod token_cmd;
 
@@ -16,6 +17,7 @@ pub async fn run(cli: Cli) -> anyhow::Result<()> {
         Command::Init { token } => init::run(&data_dir, token).await,
         Command::Doctor => doctor::run(&data_dir).await,
         Command::Run => collector::run(&data_dir).await,
+        Command::RunMcp => mcp::run(&data_dir).await,
         Command::Chats(cmd) => chats::run(&data_dir, cmd).await,
         Command::Migrate => migrate::run(&data_dir).await,
         Command::Config(cmd) => config_cmd::run(&data_dir, cmd),

@@ -13,8 +13,25 @@ const LOG_LEVELS: [&str; 5] = ["trace", "debug", "info", "warn", "error"];
 pub struct AppConfig {
     pub application: ApplicationConfig,
     pub telegram: TelegramConfig,
+    pub mcp: McpConfig,
     pub storage: StorageConfig,
     pub security: SecurityConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct McpConfig {
+    pub default_page_size: u32,
+    pub max_page_size: u32,
+}
+
+impl Default for McpConfig {
+    fn default() -> Self {
+        Self {
+            default_page_size: 100,
+            max_page_size: 500,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +147,12 @@ impl AppConfig {
                 self.telegram.poll_timeout_secs
             )));
         }
+        if self.mcp.default_page_size == 0 || self.mcp.default_page_size > self.mcp.max_page_size {
+            return Err(ConfigError::Invalid(format!(
+                "mcp.default_page_size must be within 1..=max_page_size ({}), got {}",
+                self.mcp.max_page_size, self.mcp.default_page_size
+            )));
+        }
         Ok(())
     }
 
@@ -157,6 +180,11 @@ timezone = \"UTC\"
 [telegram]
 # getUpdates long-poll timeout, seconds (1-60)
 poll_timeout_secs = 30
+
+[mcp]
+# Pagination limits for MCP read tools
+default_page_size = 100
+max_page_size = 500
 
 [storage]
 # Relative paths resolve against the data dir  (env: TGEYE_DATABASE_PATH)

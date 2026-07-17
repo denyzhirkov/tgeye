@@ -4,6 +4,7 @@ members = [
     "crates/app",
     "crates/config",
     "crates/domain",
+    "crates/mcp-server",
     "crates/storage",
     "crates/telegram",
 ]
@@ -17,6 +18,7 @@ repository = "https://github.com/denyzhirkov/tgeye"
 [workspace.dependencies]
 tgeye-config = { path = "crates/config" }
 tgeye-domain = { path = "crates/domain" }
+tgeye-mcp-server = { path = "crates/mcp-server" }
 tgeye-storage = { path = "crates/storage" }
 tgeye-telegram = { path = "crates/telegram" }
 
@@ -32,8 +34,11 @@ clap = { version = "4", features = ["derive"] }
 # 0.9 requires rustc 1.94+; stay on 0.8 until the toolchain is bumped
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
 teloxide = { version = "0.17", default-features = false, features = ["rustls"] }
+base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 chrono-tz = "0.10"
+rmcp = { version = "2", features = ["server", "macros", "transport-io"] }
+schemars = "1"
 serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
 tempfile = "3"

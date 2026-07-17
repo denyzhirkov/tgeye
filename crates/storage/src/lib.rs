@@ -1,3 +1,4 @@
+pub mod queries;
 pub mod repo;
 
 use std::path::Path;
