@@ -83,6 +83,9 @@ impl Default for TelegramConfig {
 pub struct SecurityConfig {
     pub require_chat_allowlist: bool,
     pub allow_media_download: bool,
+    /// Global gate for write tools; off by default. Even when true, a chat must be
+    /// on the separate write-allowlist (`tgeye chats allow-write`).
+    pub allow_write_tools: bool,
 }
 
 impl Default for SecurityConfig {
@@ -90,6 +93,7 @@ impl Default for SecurityConfig {
         Self {
             require_chat_allowlist: true,
             allow_media_download: true,
+            allow_write_tools: false,
         }
     }
 }
@@ -243,6 +247,8 @@ database_path = \"database.sqlite3\"
 require_chat_allowlist = true
 # false: download tools are unpublished entirely
 allow_media_download = true
+# false: the bot cannot post. When true, a chat still needs `tgeye chats allow-write <id>`
+allow_write_tools = false
 "
     }
 }

@@ -54,6 +54,16 @@ pub async fn run(data_dir: &Path, cmd: ChatsCommand) -> anyhow::Result<()> {
             repo::set_chat_rule(&mut conn, chat_id, false, Utc::now()).await?;
             println!("Chat {chat_id} denied — content will not be stored.");
         }
+        ChatsCommand::AllowWrite { chat_id } => {
+            repo::set_chat_write_rule(&mut conn, chat_id, true, Utc::now()).await?;
+            println!(
+                "Chat {chat_id} write-allowed. Also set `allow_write_tools = true` in config to enable sending."
+            );
+        }
+        ChatsCommand::DenyWrite { chat_id } => {
+            repo::set_chat_write_rule(&mut conn, chat_id, false, Utc::now()).await?;
+            println!("Chat {chat_id} write access revoked.");
+        }
     }
     Ok(())
 }

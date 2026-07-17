@@ -1,6 +1,7 @@
 pub mod mapping;
 pub mod media;
 pub mod polling;
+pub mod write;
 
 use secrecy::{ExposeSecret, SecretString};
 use teloxide::prelude::Requester;
@@ -8,6 +9,7 @@ use teloxide::prelude::Requester;
 pub use mapping::map_update;
 pub use media::TeloxideMedia;
 pub use polling::{FetchedUpdate, UpdatePoller};
+pub use write::TeloxideWrite;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TelegramError {

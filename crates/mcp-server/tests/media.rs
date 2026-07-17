@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::Utc;
-use tgeye_domain::media::{MediaError, MediaSource};
+use tgeye_domain::media::{MediaError, MediaSource, WriteError, WriteSink};
 use tgeye_domain::{
     AttachmentMeta, ChatInfo, ChatKind, IncomingMessage, MessageContentKind, UserInfo,
 };
@@ -27,6 +27,16 @@ impl MediaSource for FakeMedia {
             });
         }
         Ok(self.bytes.clone())
+    }
+}
+
+/// Write sink that always fails — media tests never call it.
+struct NoWrite;
+
+#[async_trait::async_trait]
+impl WriteSink for NoWrite {
+    async fn send(&self, _: i64, _: &str, _: Option<i64>) -> Result<i64, WriteError> {
+        Err(WriteError::Transport("not used".into()))
     }
 }
 
@@ -114,9 +124,10 @@ async fn setup(
         max_download_bytes: 10 * 1024 * 1024,
         expose_local_path: true,
         allow_media_download: true,
+        allow_write_tools: false,
     };
     (
-        TgeyeServer::new(pool.clone(), ctx, media),
+        TgeyeServer::new(pool.clone(), ctx, media, Arc::new(NoWrite)),
         pool,
         attachment_id,
     )

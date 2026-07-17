@@ -56,6 +56,16 @@ pub enum ChatsCommand {
         /// Telegram chat id (e.g. -1001234567890)
         chat_id: i64,
     },
+    /// Allow the bot to post to a chat (separate from read access)
+    AllowWrite {
+        /// Telegram chat id (e.g. -1001234567890)
+        chat_id: i64,
+    },
+    /// Revoke the bot's write access to a chat
+    DenyWrite {
+        /// Telegram chat id (e.g. -1001234567890)
+        chat_id: i64,
+    },
 }
 
 #[derive(Subcommand)]

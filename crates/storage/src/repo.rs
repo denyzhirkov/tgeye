@@ -227,6 +227,32 @@ pub async fn set_chat_rule(
     Ok(())
 }
 
+pub async fn chat_write_rule(conn: &mut SqliteConnection, chat_id: i64) -> Result<Option<bool>> {
+    let row = sqlx::query("SELECT allowed FROM chat_write_rules WHERE chat_id = ?")
+        .bind(chat_id)
+        .fetch_optional(conn)
+        .await?;
+    Ok(row.map(|r| r.get::<bool, _>("allowed")))
+}
+
+pub async fn set_chat_write_rule(
+    conn: &mut SqliteConnection,
+    chat_id: i64,
+    allowed: bool,
+    updated_at: DateTime<Utc>,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO chat_write_rules (chat_id, allowed, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT (chat_id) DO UPDATE SET allowed = excluded.allowed, updated_at = excluded.updated_at",
+    )
+    .bind(chat_id)
+    .bind(allowed)
+    .bind(fmt(updated_at))
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 #[derive(Debug)]
 pub struct ChatSummary {
     pub id: i64,

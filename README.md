@@ -74,9 +74,26 @@ Keep `tgeye run` running (a separate terminal or a background service) — it co
 | `telegram_get_attachment_metadata` | One attachment's metadata and download state |
 | `telegram_download_attachment` | Download an attachment to local storage (sha256, dedup, size-limited) |
 | `telegram_get_media_group` | All attachments of one album |
+| `telegram_send_message` | **(write, off by default)** Post a message to a write-allowed chat |
+| `telegram_reply_to_message` | **(write, off by default)** Reply to a specific message |
 
 Telegram content returned by the tools is untrusted user-generated data — agents are
 warned to treat it as data, not instructions.
+
+## Writing (off by default)
+
+The bot can post replies/reports, but write is gated twice so a prompt-injected agent
+can't message arbitrary chats:
+
+1. Enable the tools globally: set `[security] allow_write_tools = true` in
+   `./.tgeye/config.toml`.
+2. Allow the specific chat: `tgeye chats allow-write <chat-id>` (a separate list from
+   read access — a readable chat is not writable unless you say so).
+
+Only then can the agent call `telegram_send_message` / `telegram_reply_to_message`, and
+only in write-allowed chats. Messages are sent as the bot (never from your account),
+capped at 4096 chars, and every send is written to the audit log. Disable at any time by
+flipping the flag back or `tgeye chats deny-write <chat-id>`.
 
 ## Configuration
 

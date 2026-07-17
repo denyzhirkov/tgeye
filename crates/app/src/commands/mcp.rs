@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tgeye_config::AppConfig;
 use tgeye_mcp_server::{ServerContext, TgeyeServer};
-use tgeye_telegram::TeloxideMedia;
+use tgeye_telegram::{TeloxideMedia, TeloxideWrite};
 
 use super::env;
 
@@ -37,10 +37,12 @@ pub async fn run(data_dir: &Path) -> anyhow::Result<()> {
         max_download_bytes: u64::from(config.media.max_download_size_mb) * 1024 * 1024,
         expose_local_path: config.media.expose_local_path,
         allow_media_download: config.security.allow_media_download,
+        allow_write_tools: config.security.allow_write_tools,
     };
     let media = Arc::new(TeloxideMedia::new(&token));
+    let write = Arc::new(TeloxideWrite::new(&token));
     tracing::info!(bot = identity.username, "MCP stdio server starting");
-    tgeye_mcp_server::serve_stdio(TgeyeServer::new(pool, ctx, media))
+    tgeye_mcp_server::serve_stdio(TgeyeServer::new(pool, ctx, media, write))
         .await
         .map_err(|e| anyhow::anyhow!("MCP server failed: {e}"))?;
     Ok(())
