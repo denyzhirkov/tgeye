@@ -1,3 +1,5 @@
+pub mod media;
+
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

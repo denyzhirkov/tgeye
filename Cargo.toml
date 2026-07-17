@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/denyzhirkov/tgeye"
@@ -23,6 +23,8 @@ tgeye-storage = { path = "crates/storage" }
 tgeye-telegram = { path = "crates/telegram" }
 
 anyhow = "1"
+async-trait = "0.1"
+sha2 = "0.10"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 toml = "1"

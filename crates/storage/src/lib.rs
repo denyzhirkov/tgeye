@@ -1,4 +1,6 @@
+pub mod attachments;
 pub mod fts;
+pub mod media;
 pub mod queries;
 pub mod repo;
 
@@ -16,6 +18,9 @@ pub enum StorageError {
 
     #[error("migration failed: {0}")]
     Migration(#[from] sqlx::migrate::MigrateError),
+
+    #[error("media storage io error: {0}")]
+    Io(std::io::Error),
 }
 
 /// WAL-mode SQLite pool; creates the database file if missing.

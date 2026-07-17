@@ -1,7 +1,9 @@
 use std::path::Path;
+use std::sync::Arc;
 
 use tgeye_config::AppConfig;
 use tgeye_mcp_server::{ServerContext, TgeyeServer};
+use tgeye_telegram::TeloxideMedia;
 
 use super::env;
 
@@ -31,9 +33,14 @@ pub async fn run(data_dir: &Path) -> anyhow::Result<()> {
         default_page_size: i64::from(config.mcp.default_page_size),
         max_page_size: i64::from(config.mcp.max_page_size),
         require_chat_allowlist: config.security.require_chat_allowlist,
+        media_root: config.media_dir(data_dir),
+        max_download_bytes: u64::from(config.media.max_download_size_mb) * 1024 * 1024,
+        expose_local_path: config.media.expose_local_path,
+        allow_media_download: config.security.allow_media_download,
     };
+    let media = Arc::new(TeloxideMedia::new(&token));
     tracing::info!(bot = identity.username, "MCP stdio server starting");
-    tgeye_mcp_server::serve_stdio(TgeyeServer::new(pool, ctx))
+    tgeye_mcp_server::serve_stdio(TgeyeServer::new(pool, ctx, media))
         .await
         .map_err(|e| anyhow::anyhow!("MCP server failed: {e}"))?;
     Ok(())

@@ -8,14 +8,44 @@ pub const CONFIG_FILE: &str = "config.toml";
 
 const LOG_LEVELS: [&str; 5] = ["trace", "debug", "info", "warn", "error"];
 
+fn resolve_under(data_dir: &Path, value: &str) -> PathBuf {
+    let path = Path::new(value);
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        data_dir.join(path)
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AppConfig {
     pub application: ApplicationConfig,
     pub telegram: TelegramConfig,
     pub mcp: McpConfig,
+    pub media: MediaConfig,
     pub storage: StorageConfig,
     pub security: SecurityConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct MediaConfig {
+    /// Download directory; relative paths resolve against the data dir.
+    pub dir: String,
+    pub max_download_size_mb: u32,
+    /// Return the absolute local file path in download results (desktop use).
+    pub expose_local_path: bool,
+}
+
+impl Default for MediaConfig {
+    fn default() -> Self {
+        Self {
+            dir: "media".into(),
+            max_download_size_mb: 50,
+            expose_local_path: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,12 +82,14 @@ impl Default for TelegramConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct SecurityConfig {
     pub require_chat_allowlist: bool,
+    pub allow_media_download: bool,
 }
 
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
             require_chat_allowlist: true,
+            allow_media_download: true,
         }
     }
 }
@@ -153,17 +185,25 @@ impl AppConfig {
                 self.mcp.max_page_size, self.mcp.default_page_size
             )));
         }
+        if self.media.max_download_size_mb == 0 {
+            return Err(ConfigError::Invalid(
+                "media.max_download_size_mb must be at least 1".into(),
+            ));
+        }
+        if self.media.dir.trim().is_empty() {
+            return Err(ConfigError::Invalid("media.dir must not be empty".into()));
+        }
         Ok(())
     }
 
     /// Relative `database_path` is resolved against the data dir.
     pub fn database_path(&self, data_dir: &Path) -> PathBuf {
-        let path = Path::new(&self.storage.database_path);
-        if path.is_absolute() {
-            path.to_path_buf()
-        } else {
-            data_dir.join(path)
-        }
+        resolve_under(data_dir, &self.storage.database_path)
+    }
+
+    /// Relative `media.dir` is resolved against the data dir.
+    pub fn media_dir(&self, data_dir: &Path) -> PathBuf {
+        resolve_under(data_dir, &self.media.dir)
     }
 
     /// Commented template written by `tgeye init`; values match `Default`.
@@ -186,6 +226,14 @@ poll_timeout_secs = 30
 default_page_size = 100
 max_page_size = 500
 
+[media]
+# Download directory (relative paths resolve against the data dir)
+dir = \"media\"
+# Refuse to download attachments larger than this
+max_download_size_mb = 50
+# Return the absolute local file path in download results (handy for desktop agents)
+expose_local_path = true
+
 [storage]
 # Relative paths resolve against the data dir  (env: TGEYE_DATABASE_PATH)
 database_path = \"database.sqlite3\"
@@ -193,6 +241,8 @@ database_path = \"database.sqlite3\"
 [security]
 # true: message content is stored only for chats allowed via `tgeye chats allow <id>`
 require_chat_allowlist = true
+# false: download tools are unpublished entirely
+allow_media_download = true
 "
     }
 }

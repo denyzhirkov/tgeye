@@ -1,10 +1,12 @@
 pub mod mapping;
+pub mod media;
 pub mod polling;
 
 use secrecy::{ExposeSecret, SecretString};
 use teloxide::prelude::Requester;
 
 pub use mapping::map_update;
+pub use media::TeloxideMedia;
 pub use polling::{FetchedUpdate, UpdatePoller};
 
 #[derive(Debug, thiserror::Error)]

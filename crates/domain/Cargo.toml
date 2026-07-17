@@ -9,7 +9,9 @@ repository.workspace = true
 name = "tgeye_domain"
 
 [dependencies]
+async-trait = { workspace = true }
 chrono = { workspace = true }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true

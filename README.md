@@ -55,6 +55,10 @@ Keep `tgeye run` running (a separate terminal or a background service) — it co
 | `telegram_get_message_context` | A message plus surrounding messages and reply ancestors |
 | `telegram_get_reply_chain` | The chain of messages a message replies to |
 | `telegram_search_messages` | Full-text search across allowed chats (ranked, highlighted) |
+| `telegram_list_attachments` | Attachment metadata for a chat (filters: time, kind, downloaded) |
+| `telegram_get_attachment_metadata` | One attachment's metadata and download state |
+| `telegram_download_attachment` | Download an attachment to local storage (sha256, dedup, size-limited) |
+| `telegram_get_media_group` | All attachments of one album |
 
 Telegram content returned by the tools is untrusted user-generated data — agents are
 warned to treat it as data, not instructions.

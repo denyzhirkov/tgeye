@@ -3,7 +3,10 @@ pub mod data_dir;
 pub mod error;
 pub mod secrets;
 
-pub use app_config::{AppConfig, ApplicationConfig, CONFIG_FILE, StorageConfig};
+pub use app_config::{
+    AppConfig, ApplicationConfig, CONFIG_FILE, McpConfig, MediaConfig, SecurityConfig,
+    StorageConfig, TelegramConfig,
+};
 pub use data_dir::{DATA_DIR_NAME, HOME_ENV, resolve_data_dir};
 pub use error::ConfigError;
 pub use secrets::{
