@@ -11,19 +11,18 @@ use tgeye_telegram::{FetchedUpdate, TelegramError, UpdatePoller};
 
 use super::{env, privacy_hint};
 
-/// Shared startup: load config, resolve token, open the DB, refuse to run with
-/// pending migrations.
+/// Shared startup: load config, resolve token, open the DB, applying any pending
+/// migrations so the service self-heals after a binary upgrade.
 async fn prepare(
     data_dir: &Path,
 ) -> anyhow::Result<(AppConfig, SecretString, TokenSource, SqlitePool)> {
     let config = AppConfig::load(data_dir, env)?;
     let (token, source) = tgeye_config::load_bot_token(data_dir, env)?;
-    let pool = tgeye_storage::connect(&config.database_path(data_dir)).await?;
-    let pending = tgeye_storage::pending_migrations(&pool).await?;
-    anyhow::ensure!(
-        pending == 0,
-        "{pending} pending migration(s) — run `tgeye migrate` first"
-    );
+    let (pool, applied) =
+        tgeye_storage::connect_and_migrate(&config.database_path(data_dir)).await?;
+    if applied > 0 {
+        println!("Applied {applied} pending migration(s).");
+    }
     Ok((config, token, source, pool))
 }
 

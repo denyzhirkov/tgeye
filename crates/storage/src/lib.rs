@@ -41,6 +41,16 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StorageError> {
     Ok(())
 }
 
+/// Open the pool and bring the schema up to date, returning how many migrations
+/// were applied. Lets services self-heal after a binary upgrade instead of
+/// failing to start on a stale database.
+pub async fn connect_and_migrate(db_path: &Path) -> Result<(SqlitePool, usize), StorageError> {
+    let pool = connect(db_path).await?;
+    let applied = pending_migrations(&pool).await?;
+    run_migrations(&pool).await?;
+    Ok((pool, applied))
+}
+
 /// Known migrations not yet applied; a missing bookkeeping table counts all as pending.
 pub async fn pending_migrations(pool: &SqlitePool) -> Result<usize, StorageError> {
     let total = MIGRATOR.migrations.len();
@@ -58,6 +68,20 @@ pub async fn pending_migrations(pool: &SqlitePool) -> Result<usize, StorageError
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn connect_and_migrate_applies_then_reports_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cam.sqlite3");
+        let (pool, applied) = connect_and_migrate(&path).await.unwrap();
+        assert_eq!(applied, MIGRATOR.migrations.len());
+        assert_eq!(pending_migrations(&pool).await.unwrap(), 0);
+        drop(pool);
+
+        // Second open on an up-to-date DB applies nothing.
+        let (_pool, applied) = connect_and_migrate(&path).await.unwrap();
+        assert_eq!(applied, 0);
+    }
 
     #[tokio::test]
     async fn migrations_apply_and_are_idempotent() {
