@@ -1,0 +1,13 @@
+/target
+.env
+.claude/
+.kungfu/
+.tsk/
+docs/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+.tgeye/
+.DS_Store
+CLAUDE.md
+MASTER_PROMPT_TELEGRAM_BOT_MCP_RUST.md

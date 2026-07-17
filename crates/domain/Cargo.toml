@@ -1,0 +1,15 @@
+[package]
+name = "tgeye-domain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "tgeye_domain"
+
+[dependencies]
+chrono = { workspace = true }
+
+[lints]
+workspace = true
